@@ -292,11 +292,11 @@ Return ONLY a valid JSON object with no markdown, no explanation, and no extra t
 app.get("/api/phrase", verifyJwt, async (req, res) => {
   try {
     // ── 1. Validate query parameters ──
-    const { source_language, difficulty: difficultyRaw } = req.query;
+    const { source_language, target_language, difficulty: difficultyRaw } = req.query;
 
-    if (!source_language || !difficultyRaw) {
+    if (!source_language || !target_language || !difficultyRaw) {
       return res.status(400).json({
-        error: "Missing required query parameters: source_language, difficulty",
+        error: "Missing required query parameters: source_language, target_language, difficulty",
       });
     }
 
@@ -314,7 +314,7 @@ const prompt = `Generate a single natural phrase written in ${source_language} f
 - phrase: the generated phrase string in ${source_language}
 - hints: an array of ${difficulty} hint objects, each containing:
   - word: a key word from the phrase in ${source_language}
-  - translation: the English translation of that word
+  - translation: the translation of that word in ${target_language}
 Pick the most important or difficult words from the phrase as hints. Do not repeat the same word twice in hints.`;
 
 const response = await ai.models.generateContent({
@@ -360,6 +360,7 @@ const response = await ai.models.generateContent({
       phrase_id,
       difficulty,
       source_language,
+      target_language,
     });
   } catch (error) {
     console.error("Unexpected error in /api/phrase:", error);
