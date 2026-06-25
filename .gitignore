@@ -1,6 +1,8 @@
 node_modules
-libs
-
 .env
-index.js
-package*.json
+
+# libs
+# index.js
+# package*.json
+
+# dataset
