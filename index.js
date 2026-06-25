@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import cors from "cors";
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
@@ -7,6 +8,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { parseBuffer } from "music-metadata";
 import { ai } from "./libs/googleGenAi.js";
+import supabase from "./libs/supabaseClient.js";
 
 // ESM __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -14,6 +16,17 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// ──────────────────────────────────────────────
+// CORS — allow all origins
+// ──────────────────────────────────────────────
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Authorization", "Content-Type"],
+  })
+);
 
 // Multer config — store file in memory buffer
 const upload = multer({ storage: multer.memoryStorage() });
@@ -61,9 +74,38 @@ function getExtensionFromMime(mimetype) {
 }
 
 // ──────────────────────────────────────────────
-// POST /api/evaluate
+// JWT Authentication Middleware
 // ──────────────────────────────────────────────
-app.post("/api/evaluate", upload.single("audio"), async (req, res) => {
+async function verifyJwt(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Missing access token" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      return res.status(401).json({ error: "Invalid or expired token" });
+    }
+
+    req.user = user;
+    next();
+  } catch {
+    return res.status(401).json({ error: "Invalid or expired token" });
+  }
+}
+
+// ──────────────────────────────────────────────
+// POST /api/evaluate (protected)
+// ──────────────────────────────────────────────
+app.post("/api/evaluate", verifyJwt, upload.single("audio"), async (req, res) => {
   try {
     // ── 1. Validate audio file ──
     if (!req.file) {
@@ -75,7 +117,6 @@ app.post("/api/evaluate", upload.single("audio"), async (req, res) => {
       "source_language",
       "target_language",
       "source_prompt",
-      "speaker_id",
       "gender",
       "age",
       "user_mother_tongue",
@@ -94,12 +135,14 @@ app.post("/api/evaluate", upload.single("audio"), async (req, res) => {
       source_language,
       target_language,
       source_prompt,
-      speaker_id,
       gender,
       age,
       user_mother_tongue,
       tone,
     } = req.body;
+
+    // Use authenticated user id — never trust client-provided speaker_id
+    const speaker_id = req.user.id;
 
     // console.log("Audio received : " + JSON.stringify(req.file));
     // console.log("Body received : " + JSON.stringify(req.body));
