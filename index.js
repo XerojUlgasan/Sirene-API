@@ -287,6 +287,82 @@ Return ONLY a valid JSON object with no markdown, no explanation, and no extra t
 });
 
 // ──────────────────────────────────────────────
+// GET /api/phrase (protected)
+// ──────────────────────────────────────────────
+app.get("/api/phrase", verifyJwt, async (req, res) => {
+  try {
+    // ── 1. Validate query parameters ──
+    const { source_language, difficulty: difficultyRaw } = req.query;
+
+    if (!source_language || !difficultyRaw) {
+      return res.status(400).json({
+        error: "Missing required query parameters: source_language, difficulty",
+      });
+    }
+
+    const difficulty = parseInt(difficultyRaw, 10);
+
+    if (![1, 2, 3].includes(difficulty)) {
+      return res.status(400).json({ error: "difficulty must be 1, 2, or 3" });
+    }
+
+    // ── 2. Generate phrase_id ──
+    const phrase_id = `phrase_${uuidv4().replace(/-/g, "").slice(0, 8)}`;
+
+    // ── 3. Ask Gemini to generate a phrase ──
+    const prompt = `Generate a single natural phrase written in ${source_language} for a language translation exercise. The difficulty level is ${difficulty} out of 3, where 1 is short and simple, 2 is medium and conversational, and 3 is long and complex with nuanced meaning. The phrase must get progressively longer and harder as difficulty increases. Do not include any translation. Return ONLY a valid JSON object with no markdown, no explanation, and no extra text, containing exactly one field:
+- phrase: the generated phrase string in ${source_language}`;
+
+const response = await ai.models.generateContent({
+//   model: "gemini-3.1-flash-lite",
+  model: "gemini-2.5-flash",
+  config: {
+    temperature: 1.5,
+    topP: 0.95,
+    topK: 64,
+  },
+  contents: [
+    {
+      role: "user",
+      parts: [{ text: prompt }],
+    },
+  ],
+});
+
+    const rawText = response.text.trim();
+
+    // ── 4. Parse Gemini response ──
+    let parsed;
+    try {
+      const cleaned = rawText
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      parsed = JSON.parse(cleaned);
+    } catch {
+      console.error("Failed to parse phrase from Gemini:", rawText);
+      return res.status(500).json({ error: "Failed to parse phrase from Gemini" });
+    }
+
+    if (!parsed.phrase) {
+      return res.status(500).json({ error: "Gemini response missing required field: phrase" });
+    }
+
+    // ── 5. Return generated phrase ──
+    return res.json({
+      phrase: parsed.phrase,
+      phrase_id,
+      difficulty,
+      source_language,
+    });
+  } catch (error) {
+    console.error("Unexpected error in /api/phrase:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ──────────────────────────────────────────────
 // Start server
 // ──────────────────────────────────────────────
 app.listen(process.env.PORT, () => {
