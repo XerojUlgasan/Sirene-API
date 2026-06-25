@@ -310,8 +310,12 @@ app.get("/api/phrase", verifyJwt, async (req, res) => {
     const phrase_id = `phrase_${uuidv4().replace(/-/g, "").slice(0, 8)}`;
 
     // ── 3. Ask Gemini to generate a phrase ──
-    const prompt = `Generate a single natural phrase written in ${source_language} for a language translation exercise. The difficulty level is ${difficulty} out of 3, where 1 is short and simple, 2 is medium and conversational, and 3 is long and complex with nuanced meaning. The phrase must get progressively longer and harder as difficulty increases. Do not include any translation. Return ONLY a valid JSON object with no markdown, no explanation, and no extra text, containing exactly one field:
-- phrase: the generated phrase string in ${source_language}`;
+const prompt = `Generate a single natural phrase written in ${source_language} for a language translation exercise. The difficulty level is ${difficulty} out of 3, where 1 is short and simple, 2 is medium and conversational, and 3 is long and complex with nuanced meaning. The phrase must get progressively longer and harder as difficulty increases. Do not include any translation. Return ONLY a valid JSON object with no markdown, no explanation, and no extra text, containing exactly these fields:
+- phrase: the generated phrase string in ${source_language}
+- hints: an array of ${difficulty} hint objects, each containing:
+  - word: a key word from the phrase in ${source_language}
+  - translation: the English translation of that word
+Pick the most important or difficult words from the phrase as hints. Do not repeat the same word twice in hints.`;
 
 const response = await ai.models.generateContent({
   model: "gemini-3.1-flash-lite",
@@ -352,6 +356,7 @@ const response = await ai.models.generateContent({
     // ── 5. Return generated phrase ──
     return res.json({
       phrase: parsed.phrase,
+      hints: parsed.hints || [],
       phrase_id,
       difficulty,
       source_language,
