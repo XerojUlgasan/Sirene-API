@@ -117,9 +117,6 @@ app.post("/api/evaluate", verifyJwt, upload.single("audio"), async (req, res) =>
       "source_language",
       "target_language",
       "source_prompt",
-      "gender",
-      "age",
-      "user_mother_tongue",
       "tone",
     ];
 
@@ -135,14 +132,15 @@ app.post("/api/evaluate", verifyJwt, upload.single("audio"), async (req, res) =>
       source_language,
       target_language,
       source_prompt,
-      gender,
-      age,
-      user_mother_tongue,
       tone,
     } = req.body;
 
-    // Use authenticated user id — never trust client-provided speaker_id
+    // Derive identity fields from authenticated user's metadata
     const speaker_id = req.user.id;
+    const userMeta = req.user.user_metadata || {};
+    const gender = userMeta.sex || "prefer not to say";
+    const age = userMeta.age ?? "unknown";
+    const user_mother_tongue = userMeta.mother_tongue || "unknown";
 
     // console.log("Audio received : " + JSON.stringify(req.file));
     // console.log("Body received : " + JSON.stringify(req.body));
