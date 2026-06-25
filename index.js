@@ -314,8 +314,8 @@ app.get("/api/phrase", verifyJwt, async (req, res) => {
 - phrase: the generated phrase string in ${source_language}`;
 
 const response = await ai.models.generateContent({
-//   model: "gemini-3.1-flash-lite",
-  model: "gemini-2.5-flash",
+  model: "gemini-3.1-flash-lite",
+//   model: "gemini-2.5-flash",
   config: {
     temperature: 1.5,
     topP: 0.95,
