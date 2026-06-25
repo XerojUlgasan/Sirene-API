@@ -1,0 +1,6 @@
+node_modules
+libs
+
+.env
+index.js
+package*.json
