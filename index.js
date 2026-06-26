@@ -28,6 +28,8 @@ app.use(
   })
 );
 
+app.use(express.json());
+
 // Multer config — store file in memory buffer
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -364,6 +366,94 @@ const response = await ai.models.generateContent({
     });
   } catch (error) {
     console.error("Unexpected error in /api/phrase:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ──────────────────────────────────────────────
+// POST /api/vocab-blitz (protected)
+// ──────────────────────────────────────────────
+app.post("/api/vocab-blitz", verifyJwt, async (req, res) => {
+  try {
+    // ── 1. Validate request body ──
+    const { source_language, target_language } = req.body;
+
+    if (!source_language || !target_language) {
+      return res.status(400).json({
+        error: "Missing required fields: source_language, target_language",
+      });
+    }
+
+    // ── 2. Ask Gemini to generate vocabulary pairs ──
+    const prompt = `You are a language-learning vocabulary generator.
+
+Generate exactly 20 unique vocabulary words for language learners.
+
+Requirements:
+- Source language: ${source_language}
+- Target language: ${target_language}
+- Use only common everyday vocabulary.
+- Do not use phrases.
+- Do not use sentences.
+- Do not use proper nouns.
+- Do not use slang.
+- Do not use offensive language.
+- Do not use technical or advanced vocabulary.
+- Each item must contain one word and its direct translation.
+- All translations must be accurate and natural.
+
+Return ONLY valid JSON.
+
+Schema:
+{
+  "words": [
+    {
+      "word": "source language word",
+      "translation": "target language translation",
+      "explanation": "a brief explanation of the word in target language, maximum 10 words"
+    }
+  ]
+}
+
+The array must contain exactly 20 items.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-lite",
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }],
+        },
+      ],
+    });
+
+    const rawText = response.text.trim();
+
+    // ── 3. Parse Gemini response ──
+    let parsed;
+    try {
+      const cleaned = rawText
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      parsed = JSON.parse(cleaned);
+    } catch (parseError) {
+      console.error("Failed to parse vocab list from Gemini:", rawText, parseError);
+      return res.status(500).json({ error: "Failed to parse vocabulary from Gemini" });
+    }
+
+    if (!parsed.words || !Array.isArray(parsed.words)) {
+      return res.status(500).json({ error: "Gemini response missing or invalid 'words' array" });
+    }
+
+    // ── 4. Return generated vocabulary list ──
+    return res.json({
+      success: true,
+      words: parsed.words,
+    });
+  } catch (error) {
+    console.error("Unexpected error in /api/vocab-blitz:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
