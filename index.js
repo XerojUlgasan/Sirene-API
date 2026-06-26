@@ -143,6 +143,7 @@ app.post("/api/evaluate", verifyJwt, upload.single("audio"), async (req, res) =>
     const gender = userMeta.sex || "prefer not to say";
     const age = userMeta.age ?? "unknown";
     const user_mother_tongue = userMeta.mother_tongue || "unknown";
+    const agreed_to_share_audio = userMeta.agreed_to_share_audio;
 
     // console.log("Audio received : " + JSON.stringify(req.file));
     // console.log("Body received : " + JSON.stringify(req.body));
@@ -230,6 +231,23 @@ Return ONLY a valid JSON object with no markdown, no explanation, and no extra t
         clip_id,
         skipped: true,
         reason: "Accuracy below 50 — not saved to dataset",
+        transcription: evaluation.transcription,
+        fluency: evaluation.fluency,
+        pronunciation: evaluation.pronunciation,
+        completeness: evaluation.completeness,
+        accuracy: evaluation.accuracy,
+        overall_score: evaluation.overall_score,
+        feedback: evaluation.feedback,
+      });
+    }
+
+    // ── 7.5. Check if user agreed to share audio ──
+    if (agreed_to_share_audio !== true) {
+      console.log(`Skipping clip ${clip_id} — user did not agree to share audio`);
+      return res.json({
+        clip_id,
+        skipped: true,
+        reason: "User did not agree to share audio — not saved to dataset",
         transcription: evaluation.transcription,
         fluency: evaluation.fluency,
         pronunciation: evaluation.pronunciation,
