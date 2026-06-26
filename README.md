@@ -1,3 +1,5 @@
+NOTE: DATASET REPOSITORY IS MOVED TO ANOTHER REPO https://github.com/XerojUlgasan/Sirene-Dataset
+
 # Sirene
 
 Sirene is an open-source crowdsourced speech dataset project focused on collecting and preserving Philippine languages through community-contributed voice recordings.
